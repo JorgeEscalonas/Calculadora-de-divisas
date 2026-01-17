@@ -1,29 +1,38 @@
 <template>
-  <div class="min-h-screen flex justify-center items-center p-4">
-    <div class="w-full max-w-[420px] bg-white/5 backdrop-blur-xl rounded-4xl p-6 md:p-8 border border-white/20 ">
+  <div class="min-h-screen flex justify-center items-start md:items-center p-0 md:p-4">
+    <div class="w-full md:max-w-[420px] bg-white/5 backdrop-blur-xl rounded-none md:rounded-4xl p-6 md:p-8 border-0 md:border md:border-white/20 min-h-screen md:min-h-0 flex flex-col justify-center md:block">
       <div class="flex flex-col gap-2 md:gap-6">
         
         <!-- Header -->
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="flex items-center justify-center m-2">
-              <img src="../assets/logo.png" alt="Al Cambio Logo" class="w-[50px] h-[50px]" />
+        <div class="grid grid-cols-3 items-center w-full">
+          <div class="justify-self-start">
+            <div class="flex items-center justify-center m-0 md:m-2">
+              <img src="../assets/logo.png" alt="Al Cambio Logo" class="w-[36px] h-[36px] md:w-[50px] md:h-[50px]" />
             </div>
           </div>
-          <h1 class="text-white text-[1.6rem] md:text-[2rem] font-bold">Calculadora</h1>
-          <div class="flex gap-3 md:gap-5">
+          
+          <h1 class="text-white text-lg md:text-[2rem] font-bold justify-self-center tracking-tighter md:tracking-normal">Calculadora</h1>
+          
+          <div class="flex gap-0.5 md:gap-3 justify-self-end">
             <button
-              class="bg-white/5 shadow-[0_8px_32px_rgba(255,255,255,0.02)] text-green-500 cursor-pointer p-2 rounded-xl transition-all duration-300 hover:bg-green-500/10 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="bg-white/5 shadow-[0_8px_32px_rgba(255,255,255,0.02)] text-green-500 cursor-pointer p-1.5 md:p-2 rounded-xl transition-all duration-300 hover:bg-green-500/10 hover:-translate-y-0.5"
+              @click="resetFields"
+              title="Limpiar campos"
+            >
+              <EraserIcon class="h-4 w-4 md:h-5 md:w-5" />
+            </button>
+            <button
+              class="bg-white/5 shadow-[0_8px_32px_rgba(255,255,255,0.02)] text-green-500 cursor-pointer p-1.5 md:p-2 rounded-xl transition-all duration-300 hover:bg-green-500/10 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
               @click="refreshRates"
               :disabled="isLoading"
             >
-              <RefreshCwIcon class="h-5 w-5" :class="{ 'animate-spin': isLoading }" />
+              <RefreshCwIcon class="h-4 w-4 md:h-5 md:w-5" :class="{ 'animate-spin': isLoading }" />
             </button>
             <button
-              class="bg-white/5 shadow-[0_8px_32px_rgba(255,255,255,0.02)] text-green-500 cursor-pointer p-2 rounded-xl transition-all duration-300 hover:bg-green-500/10 hover:-translate-y-0.5"
+              class="bg-white/5 shadow-[0_8px_32px_rgba(255,255,255,0.02)] text-green-500 cursor-pointer p-1.5 md:p-2 rounded-xl transition-all duration-300 hover:bg-green-500/10 hover:-translate-y-0.5"
               @click="shareRates"
             >
-              <ShareIcon class="h-5 w-5" />
+              <ShareIcon class="h-4 w-4 md:h-5 md:w-5" />
             </button>
           </div>
         </div>
@@ -125,7 +134,7 @@ ultima actualizacion: {{ formattedLastUpdate }}
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useExchangeRates } from './service';
-import { RefreshCwIcon, ShareIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon } from 'lucide-vue-next';
+import { RefreshCwIcon, ShareIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, EraserIcon } from 'lucide-vue-next';
 
 const { rates, fetchRates } = useExchangeRates();
 const selectedCurrency = ref('usd'); 
@@ -201,6 +210,11 @@ const shareRates = () => {
     copyToClipboard(text);
     showNotification('Tasas copiadas al portapapeles', 'success');
   }
+};
+
+const resetFields = () => {
+  currencyAmount.value = 1;
+  calculateBsAmount();
 };
 
 const showNotification = (message, type = 'info') => {
