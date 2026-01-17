@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+        {
+            "source": "/binance-api/:path*",
+            "destination": "https://p2p.binance.com/:path*"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}
