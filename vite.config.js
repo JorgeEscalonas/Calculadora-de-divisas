@@ -15,4 +15,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    proxy: {
+      '/binance-api': {
+        target: 'https://p2p.binance.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/binance-api/, ''),
+        headers: {
+          'Origin': 'https://p2p.binance.com',
+          'Referer': 'https://p2p.binance.com/'
+        }
+      }
+    }
+  }
 })

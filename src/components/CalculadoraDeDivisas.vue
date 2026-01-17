@@ -136,7 +136,8 @@ const notification = ref({ show: false, message: '', type: '' });
 
 const currencyTypes = {
   usd: { title: 'Dolar', symbol: '$' },
-  eur: { title: 'Euro', symbol: '' },
+  eur: { title: 'Euro', symbol: '€' },
+  usdt: { title: 'USDT', symbol: '₮' },
 };
 
 const currencySymbol = computed(() => currencyTypes[selectedCurrency.value]?.symbol || '$');
