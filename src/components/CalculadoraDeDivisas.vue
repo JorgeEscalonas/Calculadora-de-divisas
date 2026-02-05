@@ -58,16 +58,20 @@
           <!-- Currency Input -->
           <div class="flex items-center bg-white/5 rounded-4xl p-4 md:p-5 gap-4 md:gap-5 transition-all duration-300 focus-within:bg-white/10 focus-within:ring-2 focus-within:ring-green-500/20">
             <span class="text-green-500 text-lg md:text-xl font-semibold">{{ currencySymbol }}</span>
-            <input 
-              type="number" 
-              v-model="currencyAmount"
-              placeholder="0.00"
+            <input
+              type="text"
+              inputmode="numeric"
+              v-model="currencyInput"
+              placeholder="0,00"
               class="bg-transparent border-0 text-white text-3xl md:text-3xl w-full outline-none appearance-none text-right font-semibold tracking-wide tabular-nums placeholder-white/30 caret-green-400 selection:bg-green-500/30"
-              @input="calculateBsAmount"
+              @keydown="onCurrencyKeydown"
+              @paste="onCurrencyPaste"
+              @focus="onCurrencyFocus"
+              @blur="onCurrencyBlur"
             />
             <button
               class="bg-transparent border-0 text-gray-400 cursor-pointer p-2 rounded-full transition-all duration-300 hover:text-green-500 hover:scale-110"
-              @click="copyToClipboard(currencyAmount)"
+              @click="copyToClipboard(currencyInput)"
             >
               <CopyIcon class="h-4 w-4" />
             </button>
@@ -76,16 +80,20 @@
           <!-- Bs Input -->
           <div class="flex items-center bg-white/5 rounded-4xl p-4 md:p-5 gap-4 md:gap-5 transition-all duration-300 focus-within:bg-white/10 focus-within:ring-2 focus-within:ring-green-500/20">
             <span class="text-green-500 text-lg md:text-xl font-semibold">Bs</span>
-            <input 
-              type="number" 
-              v-model="bsAmount"
-              placeholder="0.00"
+            <input
+              type="text"
+              inputmode="numeric"
+              v-model="bsInput"
+              placeholder="0,00"
               class="bg-transparent border-0 text-white text-3xl md:text-3xl w-full outline-none appearance-none text-right font-semibold tracking-wide tabular-nums placeholder-white/30 caret-green-400 selection:bg-green-500/30"
-              @input="calculateCurrencyAmount"
+              @keydown="onBsKeydown"
+              @paste="onBsPaste"
+              @focus="onBsFocus"
+              @blur="onBsBlur"
             />
             <button
               class="bg-transparent border-0 text-gray-400 cursor-pointer p-2 rounded-full transition-all duration-300 hover:text-green-500 hover:scale-110"
-              @click="copyToClipboard(bsAmount)"
+              @click="copyToClipboard(bsInput)"
             >
               <CopyIcon class="h-4 w-4" />
             </button>
@@ -132,14 +140,30 @@ ultima actualizacion: {{ formattedLastUpdate }}
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useExchangeRates } from './service';
-import { RefreshCwIcon, ShareIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, EraserIcon } from 'lucide-vue-next';
+import {
+  RefreshCwIcon,
+  ShareIcon,
+  CopyIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  EraserIcon,
+} from 'lucide-vue-next';
+
+const LOCALE = 'es-VE';
 
 const { rates, fetchRates } = useExchangeRates();
-const selectedCurrency = ref('usd'); 
+const selectedCurrency = ref('usd');
+
+// Estado numérico
 const currencyAmount = ref(1);
 const bsAmount = ref(0);
+
+// Estado de inputs (strings formateados o dígitos en edición)
+const currencyInput = ref('');
+const bsInput = ref('');
+
 const isLoading = ref(false);
 const notification = ref({ show: false, message: '', type: '' });
 
@@ -163,7 +187,7 @@ const formattedLastUpdate = computed(() => {
   if (!lastUpdate.value) return 'N/A';
   const date = new Date(lastUpdate.value);
   if (isNaN(date.getTime())) return 'N/A';
-  return new Intl.DateTimeFormat('es-VE', {
+  return new Intl.DateTimeFormat(LOCALE, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -172,14 +196,349 @@ const formattedLastUpdate = computed(() => {
   }).format(date);
 });
 
+// Helpers
+const formatNumber = (value) => {
+  const num = Number(value) || 0;
+  return new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+};
+
+const parseLocaleNumber = (str) => {
+  if (str === undefined || str === null) return 0;
+  let s = String(str).trim();
+  if (!s) return 0;
+  s = s.replace(/\s/g, '');
+  if (s.includes('.') && s.includes(',')) {
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) s = s.replace(/,/g, '');
+    else s = s.replace(/\./g, '').replace(/,/g, '.');
+  } else if (s.includes(',')) s = s.replace(/\./g, '').replace(/,/g, '.');
+  else s = s.replace(/,/g, '');
+  s = s.replace(/[^0-9.-]/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+};
+
+// Cálculos
 const calculateBsAmount = () => {
-  bsAmount.value = (currencyAmount.value * currentRate.value).toFixed(2);
+  const rate = parseFloat(currentRate.value) || 0;
+  const amount = parseLocaleNumber(currencyInput.value) || 0;
+  const bs = amount * rate;
+  bsAmount.value = Number(bs.toFixed(2));
+  currencyAmount.value = Number(amount.toFixed(2));
+  bsInput.value = formatNumber(bsAmount.value);
 };
 
 const calculateCurrencyAmount = () => {
-  currencyAmount.value = (bsAmount.value / currentRate.value).toFixed(2);
+  const rate = parseFloat(currentRate.value) || 0;
+  const bs = parseLocaleNumber(bsInput.value) || 0;
+  const cur = rate ? bs / rate : 0;
+  currencyAmount.value = Number(cur.toFixed(2));
+  bsAmount.value = Number(bs.toFixed(2));
+  currencyInput.value = formatNumber(currencyAmount.value);
 };
 
+// Entrada y control por dígitos (teclado y pegado)
+const currencyDigits = ref(String(Math.round((currencyAmount.value || 0) * 100)));
+const bsDigits = ref(String(Math.round((bsAmount.value || 0) * 100)));
+const currencyEditing = ref(false);
+const bsEditing = ref(false);
+
+const toAmountFromDigits = (digits) => {
+  if (!digits || String(digits).trim() === '') return 0;
+  const cleaned = (String(digits).match(/\d/g) || []).join('');
+  if (!cleaned) return 0;
+  return Number((parseInt(cleaned, 10) / 100).toFixed(2));
+};
+
+// Mapea posición en string formateado a índice en la secuencia de dígitos
+const formattedPosToDigitIndex = (formatted, pos) => {
+  let cnt = 0;
+  for (let i = 0; i < Math.min(pos, formatted.length); i++) {
+    if (/\d/.test(formatted[i])) cnt++;
+  }
+  return cnt; // number of digits to the left of pos
+};
+
+// Mapea índice de dígito a posición en string formateado (coloca caret justo después de ese dígito)
+const digitIndexToFormattedPos = (formatted, digitIndex) => {
+  if (digitIndex <= 0) return 0;
+  let cnt = 0;
+  for (let i = 0; i < formatted.length; i++) {
+    if (/\d/.test(formatted[i])) cnt++;
+    if (cnt >= digitIndex) return i + 1;
+  }
+  return formatted.length;
+};
+
+const applyCurrencyDigits = (digits) => {
+  currencyDigits.value = digits || '0';
+  const amount = toAmountFromDigits(digits);
+  currencyAmount.value = amount;
+  currencyInput.value = formatNumber(amount);
+  const rate = parseFloat(currentRate.value) || 0;
+  bsAmount.value = Number((amount * rate).toFixed(2));
+  bsDigits.value = String(Math.round(bsAmount.value * 100));
+  bsInput.value = formatNumber(bsAmount.value);
+};
+
+const applyBsDigits = (digits) => {
+  bsDigits.value = digits || '0';
+  const amount = toAmountFromDigits(digits);
+  bsAmount.value = amount;
+  bsInput.value = formatNumber(amount);
+  const rate = parseFloat(currentRate.value) || 0;
+  currencyAmount.value = rate ? Number((amount / rate).toFixed(2)) : 0;
+  currencyDigits.value = String(Math.round(currencyAmount.value * 100));
+  currencyInput.value = formatNumber(currencyAmount.value);
+};
+
+const onCurrencyKeydown = async (e) => {
+  const key = e.key;
+  const allowedControlKeys = new Set([
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+    'Home',
+    'End',
+    'Tab',
+    'Enter',
+    'Escape',
+  ]);
+
+  if (e.ctrlKey || e.metaKey) return;
+
+  const el = e.target;
+  // If not in editing mode, fall back to append behavior
+  if (!currencyEditing.value) {
+    if (/^\d$/.test(key)) {
+      e.preventDefault();
+      const next = currencyDigits.value === '0' ? key : currencyDigits.value + key;
+      applyCurrencyDigits(next);
+    }
+    if (key === 'Backspace') {
+      e.preventDefault();
+      const next = currencyDigits.value.slice(0, -1) || '0';
+      applyCurrencyDigits(next);
+    }
+    if (key === 'Delete') {
+      e.preventDefault();
+      applyCurrencyDigits('0');
+    }
+    return;
+  }
+
+  // Editing mode: operate on the raw digits string using selection
+  const value = el.value || '';
+  const selStart = el.selectionStart ?? value.length;
+  const selEnd = el.selectionEnd ?? value.length;
+
+  if (/^\d$/.test(key)) {
+    e.preventDefault();
+    const digitIndex = formattedPosToDigitIndex(value, selStart);
+    const existing = currencyDigits.value.replace(/\D/g, '') || '0';
+    const newDigits = existing.slice(0, digitIndex) + key + existing.slice(digitIndex) || '0';
+    applyCurrencyDigits(newDigits);
+    await nextTick();
+    const newDigitPos = digitIndex + 1;
+    const formatted = currencyInput.value;
+    const pos = digitIndexToFormattedPos(formatted, newDigitPos);
+    el.setSelectionRange(pos, pos);
+    return;
+  }
+
+  if (key === 'Backspace') {
+    e.preventDefault();
+    if (selStart !== selEnd) {
+      const startIndex = formattedPosToDigitIndex(value, selStart);
+      const endIndex = formattedPosToDigitIndex(value, selEnd);
+      const existing = currencyDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, startIndex) + existing.slice(endIndex) || '0';
+      applyCurrencyDigits(newDigits);
+      await nextTick();
+      const formatted = currencyInput.value;
+      const pos = digitIndexToFormattedPos(formatted, startIndex);
+      el.setSelectionRange(pos, pos);
+    } else {
+      const delIndex = formattedPosToDigitIndex(value, selStart) - 1;
+      const existing = currencyDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, Math.max(0, delIndex)) + existing.slice(delIndex + 1) || '0';
+      applyCurrencyDigits(newDigits);
+      await nextTick();
+      const formatted = currencyInput.value;
+      const pos = digitIndexToFormattedPos(formatted, Math.max(0, delIndex));
+      el.setSelectionRange(pos, pos);
+    }
+    return;
+  }
+
+  if (key === 'Delete') {
+    e.preventDefault();
+    if (selStart !== selEnd) {
+      const startIndex = formattedPosToDigitIndex(value, selStart);
+      const endIndex = formattedPosToDigitIndex(value, selEnd);
+      const existing = currencyDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, startIndex) + existing.slice(endIndex) || '0';
+      applyCurrencyDigits(newDigits);
+      await nextTick();
+      const formatted = currencyInput.value;
+      const pos = digitIndexToFormattedPos(formatted, startIndex);
+      el.setSelectionRange(pos, pos);
+    } else {
+      const delIndex = formattedPosToDigitIndex(value, selStart);
+      const existing = currencyDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, delIndex) + existing.slice(delIndex + 1) || '0';
+      applyCurrencyDigits(newDigits);
+      await nextTick();
+      const formatted = currencyInput.value;
+      const pos = digitIndexToFormattedPos(formatted, delIndex);
+      el.setSelectionRange(pos, pos);
+    }
+    return;
+  }
+
+  if (allowedControlKeys.has(key)) return;
+  if (key.length === 1) e.preventDefault();
+};
+
+const onBsKeydown = async (e) => {
+  const key = e.key;
+  const allowedControlKeys = new Set([
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+    'Home',
+    'End',
+    'Tab',
+    'Enter',
+    'Escape',
+  ]);
+
+  if (e.ctrlKey || e.metaKey) return;
+  const el = e.target;
+  if (!bsEditing.value) {
+    if (/^\d$/.test(key)) {
+      e.preventDefault();
+      const next = bsDigits.value === '0' ? key : bsDigits.value + key;
+      applyBsDigits(next);
+    }
+    if (key === 'Backspace') {
+      e.preventDefault();
+      const next = bsDigits.value.slice(0, -1) || '0';
+      applyBsDigits(next);
+    }
+    if (key === 'Delete') {
+      e.preventDefault();
+      applyBsDigits('0');
+    }
+    return;
+  }
+
+  const value = el.value || '';
+  const selStart = el.selectionStart ?? value.length;
+  const selEnd = el.selectionEnd ?? value.length;
+
+  if (/^\d$/.test(key)) {
+    e.preventDefault();
+    const digitIndex = formattedPosToDigitIndex(value, selStart);
+    const existing = bsDigits.value.replace(/\D/g, '') || '0';
+    const newDigits = existing.slice(0, digitIndex) + key + existing.slice(digitIndex) || '0';
+    applyBsDigits(newDigits);
+    await nextTick();
+    const newDigitPos = digitIndex + 1;
+    const formatted = bsInput.value;
+    const pos = digitIndexToFormattedPos(formatted, newDigitPos);
+    el.setSelectionRange(pos, pos);
+    return;
+  }
+
+  if (key === 'Backspace') {
+    e.preventDefault();
+    if (selStart !== selEnd) {
+      const startIndex = formattedPosToDigitIndex(value, selStart);
+      const endIndex = formattedPosToDigitIndex(value, selEnd);
+      const existing = bsDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, startIndex) + existing.slice(endIndex) || '0';
+      applyBsDigits(newDigits);
+      await nextTick();
+      const formatted = bsInput.value;
+      const pos = digitIndexToFormattedPos(formatted, startIndex);
+      el.setSelectionRange(pos, pos);
+    } else {
+      const delIndex = formattedPosToDigitIndex(value, selStart) - 1;
+      const existing = bsDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, Math.max(0, delIndex)) + existing.slice(delIndex + 1) || '0';
+      applyBsDigits(newDigits);
+      await nextTick();
+      const formatted = bsInput.value;
+      const pos = digitIndexToFormattedPos(formatted, Math.max(0, delIndex));
+      el.setSelectionRange(pos, pos);
+    }
+    return;
+  }
+
+  if (key === 'Delete') {
+    e.preventDefault();
+    if (selStart !== selEnd) {
+      const startIndex = formattedPosToDigitIndex(value, selStart);
+      const endIndex = formattedPosToDigitIndex(value, selEnd);
+      const existing = bsDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, startIndex) + existing.slice(endIndex) || '0';
+      applyBsDigits(newDigits);
+      await nextTick();
+      const formatted = bsInput.value;
+      const pos = digitIndexToFormattedPos(formatted, startIndex);
+      el.setSelectionRange(pos, pos);
+    } else {
+      const delIndex = formattedPosToDigitIndex(value, selStart);
+      const existing = bsDigits.value.replace(/\D/g, '') || '0';
+      const newDigits = existing.slice(0, delIndex) + existing.slice(delIndex + 1) || '0';
+      applyBsDigits(newDigits);
+      await nextTick();
+      const formatted = bsInput.value;
+      const pos = digitIndexToFormattedPos(formatted, delIndex);
+      el.setSelectionRange(pos, pos);
+    }
+    return;
+  }
+
+  if (allowedControlKeys.has(key)) return;
+  if (key.length === 1) e.preventDefault();
+};
+
+const onCurrencyPaste = (e) => {
+  e.preventDefault();
+  const text = e.clipboardData?.getData('text') || '';
+  const digits = (text.match(/\d/g) || []).join('') || '0';
+  applyCurrencyDigits(digits);
+};
+
+const onBsPaste = (e) => {
+  e.preventDefault();
+  const text = e.clipboardData?.getData('text') || '';
+  const digits = (text.match(/\d/g) || []).join('') || '0';
+  applyBsDigits(digits);
+};
+
+const onCurrencyFocus = () => {
+  currencyEditing.value = true;
+};
+
+const onCurrencyBlur = () => {
+  currencyEditing.value = false;
+  currencyInput.value = formatNumber(currencyAmount.value);
+};
+
+const onBsFocus = () => {
+  bsEditing.value = true;
+};
+
+const onBsBlur = () => {
+  bsEditing.value = false;
+  bsInput.value = formatNumber(bsAmount.value);
+};
+
+// Acciones de UI
 const selectCurrency = (currencyId) => {
   selectedCurrency.value = currencyId;
   calculateBsAmount();
@@ -200,13 +559,8 @@ const refreshRates = async () => {
 
 const shareRates = () => {
   const text = `Tasa de cambio actual: 1 ${selectedCurrency.value.toUpperCase()} = ${currentRate.value} Bs (Al Cambio)`;
-  if (navigator.share) {
-    navigator.share({
-      title: 'Tasas de Cambio',
-      text: text,
-      url: window.location.href
-    });
-  } else {
+  if (navigator.share) navigator.share({ title: 'Tasas de Cambio', text, url: window.location.href });
+  else {
     copyToClipboard(text);
     showNotification('Tasas copiadas al portapapeles', 'success');
   }
@@ -214,19 +568,18 @@ const shareRates = () => {
 
 const resetFields = () => {
   currencyAmount.value = 1;
+  currencyInput.value = formatNumber(currencyAmount.value);
   calculateBsAmount();
 };
 
 const showNotification = (message, type = 'info') => {
   notification.value = { show: true, message, type };
-  setTimeout(() => {
-    notification.value.show = false;
-  }, 3000);
+  setTimeout(() => (notification.value.show = false), 3000);
 };
 
 const copyToClipboard = async (value) => {
   try {
-    const textToCopy = value ? value.toString() : '';
+    const textToCopy = typeof value === 'string' ? value : value != null ? formatNumber(value) : '';
     await navigator.clipboard.writeText(textToCopy);
     showNotification(`Copiado: ${textToCopy}`, 'success');
   } catch (error) {
@@ -236,7 +589,24 @@ const copyToClipboard = async (value) => {
 
 onMounted(async () => {
   await fetchRates();
+  currencyInput.value = formatNumber(currencyAmount.value);
   calculateBsAmount();
+});
+
+watch(currencyAmount, (v) => {
+  currencyInput.value = formatNumber(v);
+});
+
+watch(bsAmount, (v) => {
+  bsInput.value = formatNumber(v);
+});
+
+watch(currencyAmount, (v) => {
+  currencyDigits.value = String(Math.round((v || 0) * 100));
+});
+
+watch(bsAmount, (v) => {
+  bsDigits.value = String(Math.round((v || 0) * 100));
 });
 </script>
 
