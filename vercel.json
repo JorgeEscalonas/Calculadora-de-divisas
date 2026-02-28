@@ -1,6 +1,10 @@
 {
     "rewrites": [
         {
+            "source": "/api/rates",
+            "destination": "https://scraping-bcv.vercel.app/api/rates"
+        },
+        {
             "source": "/binance-api/:path*",
             "destination": "https://p2p.binance.com/:path*"
         },
