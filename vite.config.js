@@ -17,6 +17,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      '/api/rates': {
+        target: 'https://scraping-bcv.vercel.app',
+        changeOrigin: true,
+      },
       '/binance-api': {
         target: 'https://p2p.binance.com',
         changeOrigin: true,

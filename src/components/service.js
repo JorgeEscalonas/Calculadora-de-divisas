@@ -48,30 +48,37 @@ export const useExchangeRates = () => {
 
   const fetchRates = async () => {
     try {
-      const response = await fetch('https://api.dolarvzla.com/public/exchange-rate');
+      const response = await fetch('/api/rates');
       const data = await response.json();
 
-      if (!data || !data.current || !data.previous) {
+      const ratesData = data.rates || data;
+
+      if (!ratesData || !Array.isArray(ratesData)) {
         throw new Error('Datos de la API no válidos');
       }
 
-      const { current, previous, changePercentage } = data;
+      const dolar = ratesData.find(item => item.nombre === 'Dólar');
+      const euro = ratesData.find(item => item.nombre === 'Euro');
 
-      // Para USD
-      rates.value.usd = {
-        price: current.usd,
-        change: current.usd - previous.usd,
-        percent: changePercentage.usd,
-        last_update: current.date,
-      };
+      if (dolar) {
+        // Para USD
+        rates.value.usd = {
+          price: dolar.venta || dolar.promedio,
+          change: 0,
+          percent: 0,
+          last_update: dolar.fechaActualizacion,
+        };
+      }
 
-      // Para EUR
-      rates.value.eur = {
-        price: current.eur,
-        change: current.eur - previous.eur,
-        percent: changePercentage.eur,
-        last_update: current.date,
-      };
+      if (euro) {
+        // Para EUR
+        rates.value.eur = {
+          price: euro.venta || euro.promedio,
+          change: 0,
+          percent: 0,
+          last_update: euro.fechaActualizacion,
+        };
+      }
 
       // Para USDT
       const usdtPrice = await getBinancePrice();
