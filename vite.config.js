@@ -31,5 +31,17 @@ export default defineConfig({
         }
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['vue', 'lucide-vue-next']
+        }
+      }
+    }
+  },
+  esbuild: {
+    drop: ['console', 'debugger'],
   }
 })
