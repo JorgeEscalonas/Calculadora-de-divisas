@@ -7,7 +7,7 @@
         <div class="grid grid-cols-3 items-center w-full">
           <div class="justify-self-start">
             <div class="flex items-center justify-center m-0 md:m-2">
-              <img src="../assets/logo.png" alt="Al Cambio Logo" class="w-[36px] h-[36px] md:w-[50px] md:h-[50px]" />
+              <img src="../assets/logo.png" alt="Al Cambio Logo" class="w-[36px] h-[36px] md:w-[50px] md:h-[50px]" fetchpriority="high" loading="eager" />
             </div>
           </div>
           
@@ -103,18 +103,6 @@
           <div class="flex justify-between items-center text-gray-400 px-2 md:px-4" v-if="rates && rates[selectedCurrency]">
             <span class="text-sm">Tasa actual</span>
             <span class="text-green-400 font-semibold tracking-wide">{{ currentRate }} Bs/{{ selectedCurrency.toUpperCase() }}</span>
-          </div>
-
-          <!-- Change Percentage -->
-          <div 
-            class="flex items-center justify-center gap-2 text-sm md:text-base p-3 rounded-2xl"
-            :class="changePercentage > 0 ? 'text-green-500 bg-green-500/10' : changePercentage < 0 ? 'text-red-500 bg-red-500/10' : 'text-gray-400 bg-gray-500/10'"
-            v-if="changePercentage !== undefined"
-          >
-            <ArrowUpIcon v-if="changePercentage > 0" class="h-4 w-4" />
-            <ArrowDownIcon v-else-if="changePercentage < 0" class="h-4 w-4" />
-            <span v-else class="h-4 w-4"></span>
-            {{ Math.abs(changePercentage).toFixed(2) }}%
           </div>
         </div>
 
@@ -587,10 +575,15 @@ const copyToClipboard = async (value) => {
   }
 };
 
-onMounted(async () => {
-  await fetchRates();
+onMounted(() => {
+  // Calculamos inmediatamente con los valores cacheados para q la vista sea instantánea
   currencyInput.value = formatNumber(currencyAmount.value);
   calculateBsAmount();
+
+  // Lanzamos la actualización en segundo plano sin bloquear (Stale-While-Revalidate)
+  fetchRates().then(() => {
+    calculateBsAmount();
+  });
 });
 
 watch(currencyAmount, (v) => {
